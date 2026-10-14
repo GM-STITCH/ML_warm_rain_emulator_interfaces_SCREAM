@@ -3,6 +3,60 @@ set(P3_SRCS
   eamxx_p3_run.cpp
 )
 
+
+##<++ LL 20260906
+# TorchScript support is opt-in so standard EAMxx builds do not require a
+# LibTorch installation. When enabled, set Torch_DIR to the directory
+# containing TorchConfig.cmake from a compatible LibTorch package.
+option(SCREAM_P3_ENABLE_TORCHSCRIPT
+       "Enable LibTorch/TorchScript inference in P3"
+       OFF)
+
+option(SCREAM_P3_TORCHSCRIPT_SAMPLE_TEST 
+       "Enable sample test in P3"
+       OFF)
+
+set(SCREAM_P3_TORCH_CUDA_ROOT "" CACHE PATH
+    "CUDA toolkit root required by a CUDA-enabled LibTorch installation")
+
+if (SCREAM_P3_ENABLE_TORCHSCRIPT)
+  # A CUDA-enabled LibTorch package loads Caffe2's cuda.cmake while
+  # find_package(Torch) runs.  Make an explicitly supplied toolkit available
+  # through the names used by both modern CMake FindCUDAToolkit and older
+  # FindCUDA-based package configurations.  This is intentionally scoped to
+  # the optional TorchScript path; it does not turn P3 itself into a CUDA
+  # build.
+  if (SCREAM_P3_TORCH_CUDA_ROOT)
+    if (NOT IS_DIRECTORY "${SCREAM_P3_TORCH_CUDA_ROOT}")
+      message(FATAL_ERROR
+        "SCREAM_P3_TORCH_CUDA_ROOT is not a directory: "
+        "${SCREAM_P3_TORCH_CUDA_ROOT}")
+    endif()
+
+    set(CUDAToolkit_ROOT    "${SCREAM_P3_TORCH_CUDA_ROOT}")
+    set(CUDA_TOOLKIT_ROOT_DIR "${SCREAM_P3_TORCH_CUDA_ROOT}")
+    set(ENV{CUDA_HOME}      "${SCREAM_P3_TORCH_CUDA_ROOT}")
+
+    # Caffe2 enables the CUDA language after locating the toolkit.  Supplying
+    # nvcc explicitly prevents CMake from selecting an unrelated CUDA module
+    # that may happen to appear first on PATH.
+    if (EXISTS "${SCREAM_P3_TORCH_CUDA_ROOT}/bin/nvcc")
+      set(CMAKE_CUDA_COMPILER
+          "${SCREAM_P3_TORCH_CUDA_ROOT}/bin/nvcc")
+    endif()
+  endif()
+
+  find_package(Torch REQUIRED)
+
+  # Torch_CXX_FLAGS commonly carries the libstdc++ ABI selection required by
+  # LibTorch. Keep it scoped to P3 rather than changing CMAKE_CXX_FLAGS for
+  # all of EAMxx.
+  separate_arguments(SCREAM_P3_TORCH_CXX_FLAGS
+                     NATIVE_COMMAND
+                     "${TORCH_CXX_FLAGS}")
+endif()
+##-- LL
+
 # Add ETI source files if not on CUDA/HIP
 if (NOT EAMXX_ENABLE_GPU OR Kokkos_ENABLE_CUDA_RELOCATABLE_DEVICE_CODE OR Kokkos_ENABLE_HIP_RELOCATABLE_DEVICE_CODE)
   list(APPEND P3_SRCS
@@ -87,6 +141,16 @@ foreach (P3_LIB IN LISTS P3_LIBS)
     ${SCREAM_BASE_DIR}/../eam/src/physics/cam
   )
   target_link_libraries(${P3_LIB} eamxx_physics_share scream_share)
+
+  ##++ LL 2026/09
+  if (SCREAM_P3_ENABLE_TORCHSCRIPT)
+    target_compile_definitions(${P3_LIB} PUBLIC SCREAM_P3_ENABLE_TORCHSCRIPT)
+    target_compile_options(${P3_LIB} PRIVATE ${SCREAM_P3_TORCH_CXX_FLAGS})
+    target_include_directories(${P3_LIB} PRIVATE ${TORCH_INCLUDE_DIRS})
+    # p3 is often static, so retain LibTorch on its consumers' final link line.
+    target_link_libraries(${P3_LIB} ${TORCH_LIBRARIES})
+  endif()
+  ##-- LL
 endforeach()
 
 # Ensure tables are present in the data dir

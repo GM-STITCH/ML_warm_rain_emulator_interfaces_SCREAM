@@ -2,11 +2,15 @@
 #include "share/property_checks/field_lower_bound_check.hpp"
 #include "p3_functions.hpp"
 #include "eamxx_p3_process_interface.hpp"
+#ifdef SCREAM_P3_ENABLE_TORCHSCRIPT
+#include "eamxx_p3_torchscript.hpp"
+#endif
 
 #include <ekat_assert.hpp>
 #include <ekat_units.hpp>
 
 #include <array>
+#include <exception>
 
 namespace scream
 {
@@ -17,6 +21,9 @@ P3Microphysics::P3Microphysics(const ekat::Comm& comm, const ekat::ParameterList
 {
   // Nothing to do here
 }
+
+// =========================================================================================
+P3Microphysics::~P3Microphysics () = default;
 
 // =========================================================================================
 void P3Microphysics::create_requests()
@@ -278,6 +285,20 @@ void P3Microphysics::init_buffers(const ATMBufferManager &buffer_manager)
 void P3Microphysics::initialize_impl (const RunType /* run_type */)
 {
   using TPF = ekat::TeamPolicyFactory<KT::ExeSpace>;
+
+#ifdef SCREAM_P3_ENABLE_TORCHSCRIPT
+  // This parameter is optional so that enabling LibTorch support does not
+  // change existing P3 configurations that do not supply an ML model.
+  const auto model_path = m_params.get<std::string>("torchscript_model_path", "");
+  if (not model_path.empty()) {
+    try {
+      m_torchscript_model = std::make_unique<P3TorchScriptModel>(model_path);
+    } catch (const std::exception& e) {
+      EKAT_REQUIRE_MSG(false,
+        "P3 failed to load TorchScript model '" << model_path << "': " << e.what());
+    }
+  }
+#endif
 
   // Set property checks for fields in this process
   add_invariant_check<FieldWithinIntervalCheck>(get_field_out("T_mid"),m_grid,100.0,500.0,false);

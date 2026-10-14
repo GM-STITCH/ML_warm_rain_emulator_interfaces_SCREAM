@@ -7,10 +7,15 @@
 
 #include <ekat_parameter_list.hpp>
 
+#include <memory>
 #include <string>
 
 namespace scream
 {
+#ifdef SCREAM_P3_ENABLE_TORCHSCRIPT
+class P3TorchScriptModel;
+#endif
+
 /*
  * The class responsible to handle the atmosphere microphysics
  *
@@ -45,6 +50,7 @@ class P3Microphysics : public AtmosphereProcess
 public:
   // Constructors
   P3Microphysics (const ekat::Comm& comm, const ekat::ParameterList& params);
+  ~P3Microphysics ();
 
   // The type of subcomponent
   AtmosphereProcessType type () const { return AtmosphereProcessType::Physics; }
@@ -466,6 +472,12 @@ protected:
   P3F::P3Runtime           runtime_options;
   p3_preamble              p3_preproc;
   p3_postamble             p3_postproc;
+
+#ifdef SCREAM_P3_ENABLE_TORCHSCRIPT
+  // Host-side owner. The model is loaded once in initialize_impl and will be
+  // passed to the CPU P3 computational path in a later coupling step.
+  std::unique_ptr<P3TorchScriptModel> m_torchscript_model;
+#endif
 
   // WSM for internal local variables
   ekat::WorkspaceManager<Spack, KT::Device> workspace_mgr;

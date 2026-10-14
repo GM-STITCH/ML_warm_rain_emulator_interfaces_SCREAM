@@ -11,6 +11,10 @@
 
 namespace scream
 {
+#ifdef SCREAM_P3_ENABLE_TORCHSCRIPT
+class P3TorchScriptModel;
+#endif
+
 namespace p3
 {
 
@@ -137,6 +141,12 @@ template <typename ScalarT, typename DeviceT> struct Functions {
     bool use_hetfrz_classnuc                    = false;
     bool use_separate_ice_liq_frac              = false;
     bool extra_p3_diags                         = false;
+
+#ifdef SCREAM_P3_ENABLE_TORCHSCRIPT
+    // Non-owning host pointer. P3Microphysics owns the model and guarantees
+    // that it remains valid for the duration of p3_main.
+    const P3TorchScriptModel* torchscript_model = nullptr;
+#endif
 
     void
     load_runtime_options_from_file(ekat::ParameterList &params)

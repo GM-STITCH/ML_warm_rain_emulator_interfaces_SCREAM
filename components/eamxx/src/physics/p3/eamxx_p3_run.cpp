@@ -36,6 +36,10 @@ void P3Microphysics::run_impl (const double dt)
   get_field_out("micro_vap_liq_exchange").deep_copy(0.0);
   get_field_out("micro_vap_ice_exchange").deep_copy(0.0);
 
+#ifdef SCREAM_P3_ENABLE_TORCHSCRIPT
+  runtime_options.torchscript_model = m_torchscript_model.get();
+#endif
+
   // Optional extra p3 diags
   if (runtime_options.extra_p3_diags) {
     get_field_out("qr2qv_evap").deep_copy(0.0);

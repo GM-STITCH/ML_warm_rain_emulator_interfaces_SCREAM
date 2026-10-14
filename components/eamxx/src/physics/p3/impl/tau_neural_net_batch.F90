@@ -19,7 +19,7 @@ module tau_neural_net_batch
 !    character(len=*), parameter :: neural_net_path = "/glade/p/cisl/aiml/dgagne/cam_run5_models_20190726/"
 !++ LL 20260401
 !     character(len=*), parameter :: neural_net_path = "/pscratch/sd/l/linlin00/bridge_F90_cpp/" // & 
-     character(len=*), parameter :: neural_net_path = "/global/cfs/cdirs/mp193/llin/bridge_F90_cpp/" // &
+     character(len=*), parameter :: neural_net_path = "/global/cfs/cdirs/mp193/ML_warm_rain_emulators/" // &
      "TAU_microphysics_DNN/cam_run5_models_20190726/"
 !-- LL
 

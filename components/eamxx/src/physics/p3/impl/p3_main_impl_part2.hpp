@@ -7,6 +7,13 @@
 
 #include <ekat_subview_utils.hpp>
 
+#include <cmath>
+
+#ifdef SCREAM_P3_ENABLE_TORCHSCRIPT
+#include "eamxx_p3_torchscript.hpp"
+#include <iostream>
+#endif
+
 namespace scream {
 namespace p3 {
 
@@ -402,6 +409,111 @@ void Functions<S,D>
                      not_skip_all);
     }
 
+#ifdef SCREAM_P3_ENABLE_TORCHSCRIPT
+    Spack qrtend_ML(0), nctend_ML(0), nrtend_ML(0), qctend_ML(0);
+    if (runtime_options.torchscript_model != nullptr) {
+      
+#ifdef SCREAM_P3_TORCHSCRIPT_SAMPLE_TEST
+      // Diagnostic sample: repeat one [11, 1] sample across all 16 levels.
+      // Feature order matches the model input tensor [11, 16].
+      constexpr std::array<double, P3TorchScriptModel::num_inputs> sample_features = {
+        0.00029336384168, 1.9902995356e-10, 70800471.11, 0.058837683909,
+        9.363465298, 568758.77351, 8518.5056809, 501.20939251,
+        0.001072655398, 1.0000000043, 0.000000026590097846
+      };
+      P3TorchScriptModel::Input sample_input{};
+      for (int lane = 0; lane < P3TorchScriptModel::num_levels; ++lane) {
+        for (int feature = 0; feature < P3TorchScriptModel::num_inputs; ++feature) {
+          sample_input[feature * P3TorchScriptModel::num_levels + lane] = sample_features[feature];
+        }
+      }
+      const auto sample_output = runtime_options.torchscript_model->infer(sample_input);
+      std::cout << "P3 TorchScript sample output [4,16] (qrtend, nctend, nrtend, qctend):\n";
+      for (int lane = 0; lane < P3TorchScriptModel::num_levels; ++lane) {
+        std::cout << "  level " << lane << ": ";
+        for (int output = 0; output < P3TorchScriptModel::num_outputs; ++output) {
+          if (output != 0) std::cout << ", ";
+          std::cout << sample_output[lane * P3TorchScriptModel::num_outputs + output];
+        }
+        std::cout << '\n';
+      }
+#endif
+
+      P3TorchScriptModel::Input model_input{};
+      for (int lane = 0; lane < P3TorchScriptModel::num_levels; ++lane) {
+        model_input[0 * P3TorchScriptModel::num_levels + lane] = qc_incld(k)[lane];
+        model_input[1 * P3TorchScriptModel::num_levels + lane] = qr_incld(k)[lane];
+        model_input[2 * P3TorchScriptModel::num_levels + lane] = nc_incld(k)[lane];
+        model_input[3 * P3TorchScriptModel::num_levels + lane] = nr_incld(k)[lane];
+        model_input[4 * P3TorchScriptModel::num_levels + lane] = mu_c(k)[lane];
+        model_input[5 * P3TorchScriptModel::num_levels + lane] = lamc(k)[lane];
+        model_input[6 * P3TorchScriptModel::num_levels + lane] = lamr(k)[lane];
+        // The model expects N0r, while P3 stores its base-10 logarithm.
+        model_input[7 * P3TorchScriptModel::num_levels + lane] =
+          std::pow(10.0, static_cast<double>(logn0r(k)[lane]));
+        model_input[8 * P3TorchScriptModel::num_levels + lane] = rho(k)[lane];
+        model_input[9 * P3TorchScriptModel::num_levels + lane] = cld_frac_l(k)[lane];
+        model_input[10 * P3TorchScriptModel::num_levels + lane] = cld_frac_r(k)[lane];
+      }
+      const auto model_output = runtime_options.torchscript_model->infer(model_input);
+
+      for (int lane = 0; lane < P3TorchScriptModel::num_levels; ++lane) {
+        qrtend_ML[lane] = model_output[4 * lane + 0];
+        nctend_ML[lane] = model_output[4 * lane + 1];
+        nrtend_ML[lane] = model_output[4 * lane + 2];
+        qctend_ML[lane] = model_output[4 * lane + 3];
+
+        // Apply the positivity correction from ml_fixer_check.F90 per level.
+        const auto qc_tmp = qc_incld(k)[lane] + qctend_ML[lane]*dt;
+        const auto nc_tmp = nc_incld(k)[lane] + nctend_ML[lane]*dt;
+        const auto qr_tmp = qr_incld(k)[lane] + qrtend_ML[lane]*dt;
+        const auto nr_tmp = nr_incld(k)[lane] + nrtend_ML[lane]*dt;
+
+        if (qc_tmp < 0) {
+          qctend_ML[lane] = -qc_incld(k)[lane]/dt;
+          qrtend_ML[lane] = qc_incld(k)[lane]/dt;
+          nctend_ML[lane] = -nc_incld(k)[lane]/dt;
+        }
+        if (qr_tmp < 0) {
+          qrtend_ML[lane] = -qr_incld(k)[lane]/dt;
+          qctend_ML[lane] = qr_incld(k)[lane]/dt;
+          nrtend_ML[lane] = -nr_incld(k)[lane]/dt;
+        }
+        if (nc_tmp < 0) {
+          if (qc_tmp > 0) {
+            const auto nc_fixed = qc_tmp / ((4.0/3.0)*C::Pi*std::pow(5.0e-5, 3)*C::RHO_H2O.value);
+            nctend_ML[lane] = (nc_fixed - nc_incld(k)[lane])/dt;
+          } else {
+            nctend_ML[lane] = -nc_incld(k)[lane]/dt;
+          }
+        }
+        if (nr_tmp < 0) {
+          if (qr_tmp > 0) {
+            const auto nr_fixed = qr_tmp / ((4.0/3.0)*C::Pi*std::pow(5.0e-5, 3)*C::RHO_H2O.value);
+            nrtend_ML[lane] = (nr_fixed - nr_incld(k)[lane])/dt;
+          } else {
+            nrtend_ML[lane] = -nr_incld(k)[lane]/dt;
+          }
+        }
+      }
+
+    } else {
+        std::cout << "ALICEError: NO VALID TORCH MODEL LOADED!\n"; 
+    }
+
+    const auto positive_val_nr = nrtend_ML >= 0.0 && not_skip_all;
+    const auto negative_val_nr = nrtend_ML < 0.0 && not_skip_all;
+
+    const auto qcnctend_valid = qctend_ML <= 0.0 && nctend_ML <= 0.0;
+
+    // need positive values
+    qc2qr_autoconv_tend.set(not_skip_all && qcnctend_valid, -qctend_ML);
+    nc2nr_autoconv_tend.set(not_skip_all && qcnctend_valid, -nctend_ML);
+    ncautr.set(positive_val_nr && qcnctend_valid && not_skip_all, nrtend_ML); 
+    nr_selfcollect_tend.set(negative_val_nr && qcnctend_valid && not_skip_all, -nrtend_ML);
+  
+#else
+
     // cloud water autoconversion
     // NOTE: cloud_water_autoconversion must be called before droplet_self_collection
     cloud_water_autoconversion(
@@ -423,6 +535,8 @@ void Functions<S,D>
     rain_self_collection(
       rho(k), qr_incld(k), nr_incld(k),
       nr_selfcollect_tend, runtime_options, not_skip_all);
+
+#endif
 
     // Here we map the microphysics tendency rates back to CELL-AVERAGE quantities for updating
     // cell-average quantities.

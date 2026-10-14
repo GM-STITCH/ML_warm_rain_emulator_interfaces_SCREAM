@@ -1,0 +1,53 @@
+[project]
+name = "landusedata"
+version = "0.0.0"
+requires-python = ">= 3.8"
+authors = [
+    { name = "Gregory Lemieux", email = "glemieux@lbl.gov" },
+]
+description = "Python package to processing Land Use Harmonization data for use with FATES"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Development Status :: 3 - Alpha",
+    "Framework :: Pytest",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering"
+]
+dependencies = [
+    "xesmf",    # p2c: -c conda-forge
+    "netcdf4",  # p2c: -c conda-forge
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest", # p2c: -c conda-forge
+]
+lint = [
+    "flake8", # p2c: -c conda-forge
+]
+
+[project.readme]
+file = "README.md"
+content-type = "text/markdown"
+
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = "src"
+testpaths = "tests"
+addopts = [
+    "--import-mode=importlib",
+    "--verbose",
+    "--color=yes",
+]
+[project.scripts]
+fates-landusedata = "landusedata._main:main"

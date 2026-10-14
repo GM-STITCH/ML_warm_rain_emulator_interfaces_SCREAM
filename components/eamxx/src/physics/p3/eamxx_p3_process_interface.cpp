@@ -3,6 +3,11 @@
 #include "p3_functions.hpp"
 #include "eamxx_p3_process_interface.hpp"
 
+#ifdef EAMXX_HAS_PYTHON
+#include "impl/p3_py_module.hpp"
+#include <pybind11/pybind11.h>
+#endif
+
 #include <ekat_assert.hpp>
 #include <ekat_units.hpp>
 
@@ -279,6 +284,14 @@ void P3Microphysics::initialize_impl (const RunType /* run_type */)
 {
   using TPF = ekat::TeamPolicyFactory<KT::ExeSpace>;
 
+//++ LL Naser
+#ifdef EAMXX_HAS_PYTHON
+  if (has_py_module()) {
+    p3::g_p3_py_module = &std::any_cast<const pybind11::module&>(m_py_module);
+  }
+#endif
+//-- LL
+
   // Set property checks for fields in this process
   add_invariant_check<FieldWithinIntervalCheck>(get_field_out("T_mid"),m_grid,100.0,500.0,false);
   add_invariant_check<FieldWithinIntervalCheck>(get_field_out("qv"),m_grid,1e-13,0.2,true);
@@ -417,7 +430,7 @@ void P3Microphysics::initialize_impl (const RunType /* run_type */)
   infrastructure.col_location = m_buffer.col_location; // TODO: Initialize this here and now when P3 has access to lat/lon for each column.
   // --History Only
   //<LL
-  history_only.qc_incld_part1 = get_field_out("qc_incld_part1").get_view<Pack**>();
+  history_only.qc_incld_part1 = get_field_out("qc_incld_part1").get_view<Pack**>();  
   history_only.qr_incld_part1 = get_field_out("qr_incld_part1").get_view<Pack**>();
   history_only.nc_incld_part1 = get_field_out("nc_incld_part1").get_view<Pack**>();
   history_only.nr_incld_part1 = get_field_out("nr_incld_part1").get_view<Pack**>();
@@ -547,6 +560,12 @@ void P3Microphysics::initialize_impl (const RunType /* run_type */)
 void P3Microphysics::finalize_impl()
 {
   // Do nothing
+
+  //++ LL Naser
+  #ifdef EAMXX_HAS_PYTHON
+  p3::g_p3_py_module = nullptr;
+  #endif
+  //-- LL
 }
 // =========================================================================================
 } // namespace scream

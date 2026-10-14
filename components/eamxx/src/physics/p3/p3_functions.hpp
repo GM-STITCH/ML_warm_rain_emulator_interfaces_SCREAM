@@ -747,6 +747,10 @@ template <typename ScalarT, typename DeviceT> struct Functions {
   static void rain_self_collection(const Spack &rho, const Spack &qr_incld, const Spack &nr_incld,
                                    Spack &nr_selfcollect_tend, const P3Runtime &runtime_options,
                                    const Smask &context = Smask(true));
+  //++ LL 20250629
+  KOKKOS_FUNCTION
+  static void tau_emulate_collection(
+    const Spack& qc_incld, const Spack& nc_incld, const Spack& qr_incld, const Spack& nr_incld, const Spack& rho, const Spack& lamc, const Spack& lamr, const Spack& cld_frac_l, const Spack& logn0r, const Spack& mu_c, const Spack& cld_frac_r, const Scalar& dt, Spack& tau_emulate_qctend, Spack& tau_emulate_nctend, Spack& tau_emulate_qrtend, Spack& tau_emulate_nrtend, const Smask& context = Smask(true));  //-- LL
 
   // Impose maximum ice number
   KOKKOS_FUNCTION
@@ -1295,5 +1299,8 @@ constexpr ScalarT Functions<ScalarT, DeviceT>::P3C::lookup_table_1a_dum1_c;
 #include "p3_table_ice_impl.hpp"
 #include "p3_update_prognostics_impl.hpp"
 #include "p3_upwind_impl.hpp"
+//++ LL 20250629
+#include "tau_emulate_collection_impl.hpp"
+//-- LL
 #endif // GPU && !KOKKOS_ENABLE_*_RELOCATABLE_DEVICE_CODE
 #endif // P3_FUNCTIONS_HPP

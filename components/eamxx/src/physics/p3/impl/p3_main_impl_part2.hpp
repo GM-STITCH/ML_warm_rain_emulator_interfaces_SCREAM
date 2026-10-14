@@ -182,6 +182,13 @@ void Functions<S,D>
       ni_sublim_tend   (0), // change in ice number from sublimation
       qc_growth_rate  (0), // wet growth rate
 
+      //++ LL 20250628
+      tau_emulate_qctend  (0),
+      tau_emulate_nctend  (0),
+      tau_emulate_qrtend  (0),
+      tau_emulate_nrtend  (0),
+      //-- LL
+
       // initialize time/space varying physical variables
       mu      (0), // TODO(doc)
       dv      (0), // TODO(doc)
@@ -402,27 +409,59 @@ void Functions<S,D>
                      not_skip_all);
     }
 
+//++ LL 20250713 turn off the below 4 processes
+// 
     // cloud water autoconversion
     // NOTE: cloud_water_autoconversion must be called before droplet_self_collection
-    cloud_water_autoconversion(
-      rho(k), qc_incld(k), nc_incld(k), inv_qc_relvar(k),
-      qc2qr_autoconv_tend, nc2nr_autoconv_tend, ncautr, runtime_options, not_skip_all);
+//    cloud_water_autoconversion(
+//      rho(k), qc_incld(k), nc_incld(k), inv_qc_relvar(k),
+//      qc2qr_autoconv_tend, nc2nr_autoconv_tend, ncautr, runtime_options, not_skip_all);
 
     // self-collection of droplets
-    droplet_self_collection(
-      rho(k), inv_rho(k), qc_incld(k),
-      mu_c(k), nu(k), nc2nr_autoconv_tend, nc_selfcollect_tend, not_skip_all);
+//    droplet_self_collection(
+//      rho(k), inv_rho(k), qc_incld(k),
+//      mu_c(k), nu(k), nc2nr_autoconv_tend, nc_selfcollect_tend, not_skip_all);
 
     // accretion of cloud by rain
-    cloud_rain_accretion(
-      rho(k), inv_rho(k), qc_incld(k), nc_incld(k), qr_incld(k), inv_qc_relvar(k),
-      qc2qr_accret_tend, nc_accret_tend, runtime_options, not_skip_all);
+//    cloud_rain_accretion(
+//      rho(k), inv_rho(k), qc_incld(k), nc_incld(k), qr_incld(k), inv_qc_relvar(k),
+//      qc2qr_accret_tend, nc_accret_tend, runtime_options, not_skip_all);
 
     // self-collection and breakup of rain
     // (breakup following modified Verlinde and Cotton scheme)
-    rain_self_collection(
-      rho(k), qr_incld(k), nr_incld(k),
-      nr_selfcollect_tend, runtime_options, not_skip_all);
+//    rain_self_collection(
+//      rho(k), qr_incld(k), nr_incld(k),
+//      nr_selfcollect_tend, runtime_options, not_skip_all);
+
+//-- LL
+
+   //++ LL 20260401 debug ML TAU IEEE DIVIDE BY ZERO,  UNDERFLOW...
+   printf ("**********************************************************\n");
+   printf ("ALICE DEBUG -- qc, nc, qr, nr: %13.6f, %13.6f, %13.6f, %13.6f\n", qc_incld(k), nc_incld(k), qr_incld(k), nr_incld(k));
+   printf ("**********************************************************\n");
+   //-- LL
+
+   //++ LL 20250628. warm rain collision-coalescence processes handled by TAU emulator
+    tau_emulate_collection(
+        qc_incld(k), nc_incld(k), qr_incld(k), nr_incld(k), rho(k), lamc(k), lamr(k), cld_frac_l(k), logn0r(k), mu_c(k), cld_frac_r(k), dt, tau_emulate_qctend, tau_emulate_nctend, tau_emulate_qrtend, tau_emulate_nrtend, not_skip_all);
+    //-- LL
+
+    //++ LL 20250710
+
+    const auto qc_incld_not_small = qc_incld(k) >= qsmall  && not_skip_all;
+    const auto qr_incld_not_small = qr_incld(k) >= qsmall  && not_skip_all;
+    if ((qc_incld_not_small).any() || (qr_incld_not_small).any()) {
+
+        const auto positive_val = tau_emulate_nrtend >= 0.0  && not_skip_all && qc_incld_not_small;
+        const auto negative_val = tau_emulate_nrtend < 0.0  && not_skip_all && qr_incld_not_small;
+
+        qc2qr_autoconv_tend.set(qc_incld_not_small, tau_emulate_qctend);
+        nc2nr_autoconv_tend.set(qc_incld_not_small, tau_emulate_nctend);
+        ncautr.set(positive_val, tau_emulate_nrtend);
+        nr_selfcollect_tend.set(negative_val, tau_emulate_nrtend);
+    }
+
+    //-- LL
 
     // Here we map the microphysics tendency rates back to CELL-AVERAGE quantities for updating
     // cell-average quantities.

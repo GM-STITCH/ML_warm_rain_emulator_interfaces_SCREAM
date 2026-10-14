@@ -3,6 +3,14 @@ set(P3_SRCS
   eamxx_p3_run.cpp
 )
 
+#++ LL 20250702 # Add Fortran sources
+set(P3_F90_SRCS
+  impl/module_neural_net.F90
+  impl/ML_fixer_check.F90
+  impl/tau_neural_net_batch.F90
+)
+#-- LL
+
 # Add ETI source files if not on CUDA/HIP
 if (NOT EAMXX_ENABLE_GPU OR Kokkos_ENABLE_CUDA_RELOCATABLE_DEVICE_CODE OR Kokkos_ENABLE_HIP_RELOCATABLE_DEVICE_CODE)
   list(APPEND P3_SRCS
@@ -48,8 +56,10 @@ if (NOT EAMXX_ENABLE_GPU OR Kokkos_ENABLE_CUDA_RELOCATABLE_DEVICE_CODE OR Kokkos
     eti/p3_nr_conservation.cpp
     eti/p3_ni_conservation.cpp
     eti/p3_prevent_liq_supersaturation.cpp
+    eti/tau_emulate_collection.cpp
   ) # P3 ETI SRCS
 endif()
+#++ LL 20250630 add eti/tau_emulate_collection.cpp
 
 # List of dispatch source files if monolithic kernels are off
 set(P3_SK_SRCS
@@ -65,13 +75,22 @@ set(P3_SK_SRCS
 
 set(P3_LIBS "p3")
 if (SCREAM_P3_SMALL_KERNELS)
-  add_library(p3 ${P3_SRCS} ${P3_SK_SRCS})
+#++ LL 20250702
+####  add_library(p3 ${P3_SRCS} ${P3_SK_SRCS})
+    add_library(p3 ${P3_SRCS} ${P3_SK_SRCS} ${P3_F90_SRCS})
+#-- LL
 else()
-  add_library(p3 ${P3_SRCS})
+#++ LL 20250702
+####  add_library(p3 ${P3_SRCS})
+    add_library(p3 ${P3_SRCS} ${P3_F90_SRCS})
+#-- LL
   # If small kernels are ON, we don't need a separate executable to test them.
   # Also, we never want to generate baselines with this separate executable
   if (NOT SCREAM_LIB_ONLY AND NOT SCREAM_ONLY_GENERATE_BASELINES)
-    add_library(p3_sk ${P3_SRCS} ${P3_SK_SRCS})
+#++ LL20250702
+####    add_library(p3_sk ${P3_SRCS} ${P3_SK_SRCS})
+    add_library(p3_sk ${P3_SRCS} ${P3_SK_SRCS} ${P3_F90_SRCS})
+#-- LL
     # Always build p3_sk with SCREAM_P3_SMALL_KERNELS on
     target_compile_definitions(p3_sk PUBLIC "SCREAM_P3_SMALL_KERNELS")
     list(APPEND P3_LIBS "p3_sk")
@@ -87,6 +106,7 @@ foreach (P3_LIB IN LISTS P3_LIBS)
     ${SCREAM_BASE_DIR}/../eam/src/physics/cam
   )
   target_link_libraries(${P3_LIB} eamxx_physics_share scream_share)
+
 endforeach()
 
 # Ensure tables are present in the data dir

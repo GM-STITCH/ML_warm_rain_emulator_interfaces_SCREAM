@@ -12,16 +12,6 @@ set(P3_PY_SRCS
   impl/rom_utils.py
 )
 
-## controlled by atm namelist.
-##set(PY_MODULE_NAME "py_interface")
-##set(PY_MODULE_PATH "/global/cfs/cdirs/mp193/llin/github_code/E3SM_20260217_master_MLROM_v2/E3SM_master/components/eamxx/src/physics/p3/impl/")
-
-##configure_file(/global/homes/l/linlin00/cpp_python_screamv1_bridge_v4_v3/input_ml.yaml ${CMAKE_CURRENT_BINARY_DIR}/input_ml.yaml)
-## copy file over /build/cmake-bld/eamxx/src/physics/p3/
-## configure_file only places file in build tree. It does NOT: parse YAML; register YAML automatically; inject YAML into program memory.
-## this cause the bad any_cast error, Program received signal SIGSEGV: Segmentation fault - invalid memory reference. in e3sm.log
-## check debug print statement in atmosphere_process.cpp, so you know what's happening.
-## Your C++ code must still explicitly load it.
 endif()
 ##-- LL
 

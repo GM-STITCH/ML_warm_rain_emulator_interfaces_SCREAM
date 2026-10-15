@@ -7,7 +7,7 @@ def compute_coll_SDM(numbin, dt, dmdlnr_bin, dndlnr_bin, m_to_n_factors):
     LATENT_DIM = 3
     POLY_ORDER = 2
     NBIN = numbin
-    WEIGHT_DIR = "/global/cfs/cdirs/mp193/llin/github_code/cpp_SCREAM_python_ROM_interface_2026may04/ftorch_weights/erfAll_aesindy_weights.pth"
+    WEIGHT_DIR = "/global/cfs/cdirs/mp193/ML_warm_rain_emulators/ERFSDM_ROM_PY/ftorch_weights/erfAll_aesindy_weights.pth"
     M_SCALE = 0.01589495           # units: kg m^-3
     # ZLIM = np.load("./zlim_data.npz")['zlim']
     # ZLIM[-1, 0] = 0.0

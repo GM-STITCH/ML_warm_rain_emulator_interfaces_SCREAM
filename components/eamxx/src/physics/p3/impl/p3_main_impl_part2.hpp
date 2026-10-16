@@ -182,6 +182,15 @@ void Functions<S,D>
       ni_sublim_tend   (0), // change in ice number from sublimation
       qc_growth_rate  (0), // wet growth rate
 
+      #ifdef EAMXX_HAS_PYTHON
+      //++ LL 20250628
+      cc_emulate_qctend  (0),
+      cc_emulate_nctend  (0),
+      cc_emulate_qrtend  (0),
+      cc_emulate_nrtend  (0),
+      #endif
+      //-- LL
+
       // initialize time/space varying physical variables
       mu      (0), // TODO(doc)
       dv      (0), // TODO(doc)
@@ -402,6 +411,26 @@ void Functions<S,D>
                      not_skip_all);
     }
 
+#ifdef EAMXX_HAS_PYTHON
+//++ LL 20250401. warm rain collision-coalescence processes handled by YPS CC emulator
+    cc_emulate_collection(
+        qc_incld(k), nc_incld(k), qr_incld(k), nr_incld(k), rho(k), mu_c(k), mu_r(k), dt, cc_emulate_qctend, cc_emulate_nctend, cc_emulate_qrtend, cc_emulate_nrtend, not_skip_all);
+
+  const auto qc_incld_not_small = qc_incld(k) >= qsmall  && not_skip_all;
+  const auto qr_incld_not_small = qr_incld(k) >= qsmall  && not_skip_all;
+     if ((qc_incld_not_small).any() || (qr_incld_not_small).any()) {
+    
+       const auto positive_val = cc_emulate_nrtend >= 0.0  && not_skip_all;
+       const auto negative_val = cc_emulate_nrtend < 0.0  && not_skip_all; 
+       
+       qc2qr_autoconv_tend.set(qc_incld_not_small, -cc_emulate_qctend);
+       nc2nr_autoconv_tend.set(qc_incld_not_small, cc_emulate_nctend);
+       ncautr.set(positive_val, cc_emulate_nrtend);
+       nr_selfcollect_tend.set(negative_val, -cc_emulate_nrtend);   
+  }
+
+#else
+
     // cloud water autoconversion
     // NOTE: cloud_water_autoconversion must be called before droplet_self_collection
     cloud_water_autoconversion(
@@ -423,6 +452,10 @@ void Functions<S,D>
     rain_self_collection(
       rho(k), qr_incld(k), nr_incld(k),
       nr_selfcollect_tend, runtime_options, not_skip_all);
+
+#endif
+//-- LL
+
 
     // Here we map the microphysics tendency rates back to CELL-AVERAGE quantities for updating
     // cell-average quantities.

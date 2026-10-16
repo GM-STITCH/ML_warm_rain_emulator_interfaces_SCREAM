@@ -748,6 +748,17 @@ template <typename ScalarT, typename DeviceT> struct Functions {
                                    Spack &nr_selfcollect_tend, const P3Runtime &runtime_options,
                                    const Smask &context = Smask(true));
 
+  //++ LL 20260401
+  //KOKKOS_FUNCTION
+  static void cc_emulate_collection(const Spack& qc_incld, const Spack& nc_incld, 
+                                     const Spack& qr_incld, const Spack& nr_incld, 
+                                     const Spack& rho, const Spack& mu_c, const Spack& mu_r, 
+                                     const Scalar& dt, 
+                                     Spack& cc_emulate_qctend, Spack& cc_emulate_nctend, 
+                                     Spack& cc_emulate_qrtend, Spack& cc_emulate_nrtend, 
+                                     const Smask& context = Smask(true));  
+  //-- LL
+
   // Impose maximum ice number
   KOKKOS_FUNCTION
   static void impose_max_total_ni(Spack &ni_local, const Scalar &max_total_ni,

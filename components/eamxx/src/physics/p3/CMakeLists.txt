@@ -3,6 +3,15 @@ set(P3_SRCS
   eamxx_p3_run.cpp
 )
 
+##++ LL Add Python sources
+if (EAMXX_ENABLE_PYTHON)
+set(P3_PY_SRCS
+  impl/p3_coal_xgb_ml_pred.py
+)
+
+endif()
+##-- LL
+
 # Add ETI source files if not on CUDA/HIP
 if (NOT EAMXX_ENABLE_GPU OR Kokkos_ENABLE_CUDA_RELOCATABLE_DEVICE_CODE OR Kokkos_ENABLE_HIP_RELOCATABLE_DEVICE_CODE)
   list(APPEND P3_SRCS
@@ -49,6 +58,11 @@ if (NOT EAMXX_ENABLE_GPU OR Kokkos_ENABLE_CUDA_RELOCATABLE_DEVICE_CODE OR Kokkos
     eti/p3_ni_conservation.cpp
     eti/p3_prevent_liq_supersaturation.cpp
   ) # P3 ETI SRCS
+    ##++ LL add CC_emulate_collection.cpp file
+  if (EAMXX_ENABLE_PYTHON)
+    list(APPEND P3_SRCS eti/CC_emulate_collection.cpp)
+  endif()
+    ##-- LL
 endif()
 
 # List of dispatch source files if monolithic kernels are off
@@ -65,13 +79,22 @@ set(P3_SK_SRCS
 
 set(P3_LIBS "p3")
 if (SCREAM_P3_SMALL_KERNELS)
-  add_library(p3 ${P3_SRCS} ${P3_SK_SRCS})
+##++ LL
+##  add_library(p3 ${P3_SRCS} ${P3_SK_SRCS})
+  add_library(p3 ${P3_SRCS} ${P3_SK_SRCS} ${P3_PY_SRCS})
+##-- LL
 else()
-  add_library(p3 ${P3_SRCS})
+##++ LL
+##  add_library(p3 ${P3_SRCS})
+  add_library(p3 ${P3_SRCS} ${P3_PY_SRCS})
+##-- LL
   # If small kernels are ON, we don't need a separate executable to test them.
   # Also, we never want to generate baselines with this separate executable
   if (NOT SCREAM_LIB_ONLY AND NOT SCREAM_ONLY_GENERATE_BASELINES)
-    add_library(p3_sk ${P3_SRCS} ${P3_SK_SRCS})
+##++ LL
+##    add_library(p3_sk ${P3_SRCS} ${P3_SK_SRCS})
+    add_library(p3_sk ${P3_SRCS} ${P3_SK_SRCS} ${P3_PY_SRCS})
+##-- LL
     # Always build p3_sk with SCREAM_P3_SMALL_KERNELS on
     target_compile_definitions(p3_sk PUBLIC "SCREAM_P3_SMALL_KERNELS")
     list(APPEND P3_LIBS "p3_sk")
@@ -80,6 +103,17 @@ endif()
 
 target_compile_definitions(p3 PUBLIC EAMXX_HAS_P3)
 
+##++ LL Naser
+if (EAMXX_ENABLE_PYTHON)
+  execute_process(
+    COMMAND "${Python_EXECUTABLE}" -c "import pybind11; print(pybind11.get_include())"
+    OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE P3_PYBIND11_INCLUDE)
+  execute_process(
+    COMMAND "${Python_EXECUTABLE}" -c "import sysconfig; print(sysconfig.get_path('include'))"
+    OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE P3_PYTHON_INCLUDE)
+endif()
+##-- LL
+
 foreach (P3_LIB IN LISTS P3_LIBS)
   target_include_directories(${P3_LIB} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -87,6 +121,12 @@ foreach (P3_LIB IN LISTS P3_LIBS)
     ${SCREAM_BASE_DIR}/../eam/src/physics/cam
   )
   target_link_libraries(${P3_LIB} eamxx_physics_share scream_share)
+##++ LL Naser
+  if (EAMXX_ENABLE_PYTHON)
+    target_include_directories(${P3_LIB} SYSTEM PRIVATE
+      ${P3_PYBIND11_INCLUDE} ${P3_PYTHON_INCLUDE})
+  endif()
+##-- LL
 endforeach()
 
 # Ensure tables are present in the data dir
